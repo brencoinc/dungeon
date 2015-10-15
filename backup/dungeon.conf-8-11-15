@@ -1,0 +1,222 @@
+[dungeon]
+include => compass
+include => hero_start
+
+exten => s,1(start),Verbose(3,LOG Dungeon Start)
+same => n,Gosub(hero_start,s,1)
+same => n,SendText(Welcome to the Dungeon)
+same => n,Set(heronum=${CALLERID(num)})
+same => n(movement),Verbose(3,LOG movement)
+same => n,Gosub(compass,s,1)
+same => n,background(dungeon/drip)
+same => n,Goto(t,timeout)
+same => n,hangup
+
+
+exten => t,1(timeout),Verbose(3,LOG timeout loop)
+same => n,Goto(movement)
+same => n,hangup
+
+exten => i,1(invalid),Verbose(3,LOG Invalid option)
+same => n,GoTo(s,1)
+
+
+[compass]
+exten => s,1,Verbose(3,LOG Compass subroutine)
+same => n,Verbose(3, position is X=${Xgps} Y=${Ygps})
+same => n,Playback(dungeon/compass/${GET_DUNGEON_GPS(${Xgps},${Ygps})})
+same => n,Return
+
+exten => 2,1,Verbose(3,LOG North)
+same => n,GotoIf($[${ISNULL(${GET_DUNGEON_GPS(${Xgps},${MATH(${Ygps}-1)})})}]?ww,1)
+same => n,Set(Ygps=${MATH(${Ygps}-1,i)})
+same => n,Gosub(position,s,1)
+same => n,Return
+
+exten => 6,1,Verbose(3,LOG East)
+same => n,GotoIf($[${ISNULL(${GET_DUNGEON_GPS(${MATH(${Xgps}+1)},${Ygps})})}]?ww,1)
+same => n,Set(Xgps=${MATH(${Xgps}+1,i)})
+same => n,Gosub(position,s,1)
+same => n,Return
+
+exten => 4,1,Verbose(3,LOG West)
+same => n,GotoIf($[${ISNULL(${GET_DUNGEON_GPS(${MATH(${Xgps}-1)},${Ygps})})}]?ww,1)
+same => n,Set(Xgps=${MATH(${Xgps}-1,i)})
+same => n,Gosub(position,s,1)
+same => n,Return
+
+exten => 8,1,Verbose(3,LOG South)
+same => n,GotoIf($[${ISNULL(${GET_DUNGEON_GPS(${Xgps},${MATH(${Ygps}+1)})})}]?ww,1)
+same => n,Verbose(3, position is X=${Xgps} Y=${Ygps})
+same => n,Gosub(position,s,1)
+same => n,Return
+
+exten => 9,1,Verbose(3,LOG Item search)
+same => n,Playback(dungeon/item/youve-found)
+same => n,GotoIf($[${ISNULL(${GET_DUNGEON_ITEMS(${Xgps},${Ygps})})}]?empty)
+same => n,Goto(${GET_DUNGEON_ITEMS(${Xgps},${Ygps})})
+same => n(torch),NoOp(Found the Torch)
+same => n,Playback(dungeon/item/${GET_DUNGEON_ITEMS(${Xgps},${Ygps})})
+same => n,Set(torch=1)
+same => n,Verbose(3,torch is ${torch} eval is ${EVAL(${torch})})
+same => n,Gosub(position,s,1)
+same => n,Return
+same => n(empty),Verbose(3, nothing here)
+same => n,Playback(dungeon/item/empty)
+same => n,Gosub(position,s,1)
+same => n,Return
+
+
+exten => i,1,Verbose(3,LOG Invalid entry)
+same => n,Return
+;with each step add a value to X, later make encounter - rand+x. 
+;After a succesful encounter reset x to 0
+
+exten => ww,1,Verbose(3, Wrong Way)
+same => n,Playback(dungeon/compass/wrongway)
+same => n,Playback(silence/2)
+same => n,Goto(dungeon,s,movement)
+
+
+[position]
+exten => s,1,Verbose(3,LOG Position)
+same => n,Verbose(3, position is X=${Xgps} Y=${Ygps})
+;db check if room is empty
+same => n,Set(deadmonster=0)
+;same => n,Gotoif($[${deadmonster} = 1]?steps)
+same => n,GotoIf($[${EXISTS(${GET_DUNGEON_MONSTER_HEALTH(${Xgps},${Ygps})})}]?attack)
+same => n(steps),Playback(dungeon/steps)
+same => n,Goto(dungeon,s,movement)
+same => n(return),Return
+same => n,Goto(dungeon,s,movement)
+same => n(attack),Gosub(attack,s,1)
+same => n,Goto(dungeon,s,movement)
+same => n,Return
+same => n,Hangup
+
+[attack]
+exten => s,1(start),Verbose(3,LOG Attack start)
+same => n,Background(dungeon/attack)
+same => n(begin),Verbose(3,LOG Battle Begins!)
+same => n,GoSub(monsterstats,s,1)
+same => n,Verbose(3,LOG Monster Strength is ${monsterstr})
+same => n,Verbose(3,LOG Monster Weapon is ${monsterweapon})
+same => n,Verbose(3,LOG Monster Health is ${monsterhealth})
+same => n,Verbose(3,LOG Hero health is ${herohealth})
+same => n,Verbose(3,LOG Hero weapon is ${heroweapon})
+same => n,Set(attack=1)
+same => n,GotoIf($[${torch} > 0]?hattack)
+same => n,Set(attacker=M)
+same => n(fightround),Verbose(3,Begin fight sequence)
+same => n,Gotoif($[${attacker}=H]?hattack:mattack)
+same => n(mattack),Verbose(3,LOG Begin Monster Attack Roll)
+same => n,Set(attacker=M)
+same => n,Set(who=monster)
+same => n,Set(target=hero)
+;check if monster is dead
+same => n,GotoIf($[${monsterhealth} < 1]?victory)
+;set up enemy attack vs your health
+same => n,Verbose(3,LOG Monster attack)
+same => n,Set(attackroll=${RAND(1,20)})
+same => n,Verbose(3,LOG Monster Attack roll is ${attackroll} vs heros agility ${hero_agil})
+same => n,Goto(${RAND(1,2)},1)
+;same => n,Verbose(3,LOG Monster Attack roll is ${attackroll} vs heros agility ${hero_agil})
+;same => n,GotoIf($[${attackroll} > ${hero_agil}]?mhit)
+;same => n,Verbose(3,LOG Miss!)
+;same => n,Playback(dungeon/mmiss)
+;same => n,Goto(hattack)
+;
+same => n(mhit),Verbose(3,LOG Hit!)
+same => n,Playback(dungeon/mhit)
+same => n,Set(target=hero)
+same => n,Gosub(fightshortener,s,1)
+same => n,Verbose(3,LOG Hero health is ${herohealth})
+same => n,SayDigits(${herohealth})
+;same => n,Playback(silence/2)
+same => n,GotoIf($[${herohealth} < 1]?defeat)
+;
+;
+;continue to hero attack
+;
+same => n(hattack),Verbose(3,LOG Begin Hero Attack)
+same => n,Set(attacker=H)
+same => n,Set(who=hero)
+same => n,Set(target=monster)
+same => n,Set(attackroll=${RAND(1,20)})
+same => n,Verbose(3,LOG attackroll is ${attackroll})
+same => n,NoOp(weapon is ${${who}weapon})
+;same => n,Set(attack=${MATH(${attackroll}+${${who}weapon},i)})
+same => n,Set(attack=${${who}weapon})
+same => n,Background(dungeon/choseattack)
+same => n,Background(dungeon/attack)
+same => n,Goto(hattack)
+same => n(victory),Verbose(3,LOG Vrictory!)
+same => n,Set(deadmonster=1)
+same => n,Playback(dungeon/victory)
+same => n,NoOp(Write health to record ${PUT_HERO_UPDATE_HEALTH(${herohealth},${heronum})})
+same => n,Goto(compass,s,1)
+same => n,Hangup
+
+;
+exten => 1,1,Verbose(3,LOG Standard Attack)
+same => n,GotoIf($[${attackroll} < $[${who}_agil}]]?miss)
+same => n,Playback(dungeon/hit)
+same => n,Gosub(fightshortener,s,1)
+same => n,Verbose(3,LOG ${who} health is ${${who}health})
+same => n,SayDigits(${whohealth})
+same => n,ExecIf($[${attacker}=M]?Set(attacker=H):Set(attacker=M))
+same => n(miss),Verbose(3,LOG Attack Missed!)
+same => n,Playback(dungeon/${who}miss)
+same => n,Goto(s,mattack)
+same => n,Hangup
+
+exten => 2,1,Verbose(3,LOG Standard Attack)
+;same => n,GotoIf($[${attackroll} < ${monster_agil}]?miss)
+same => n,GotoIf($[${attackroll} < 15]?miss)
+same => n(hit),Playback(dungeon/hit)
+same => n,Set(attack=${MATH(${attack} * 2,i)})
+same => n,Gosub(fightshortener,s,1)
+same => n,Verbose(3,LOG ${who} health is ${${who}health})
+same => n,SayDigits(${${who}health})
+same => n,Goto(s,mattack)
+same => n(miss),Verbose(3,LOG Attack Missed!)
+same => n,Playback(dungeon/miss)
+same => n,Goto(s,mattack)
+same => n,Hangup
+
+exten => 3,1,Verbose(3,LOG Runaway)
+same => n,GotoIf(${MATH(${attackroll} + ${${who}_agil},i)} > ${${who}_agil}?escape)
+same => n,Background(dungeon/${who}_escapefail)
+same => n,Goto(s,fightround)
+same => n(escape),Verbose(3,LOG escape)
+same => n,Background(dungeon/${who}_escape)
+same => n,NoOp(Write health to record ${PUT_HERO_UPDATE_HEALTH(${herohealth},${heronum})})
+same => n,Goto(position,s,return)
+
+exten => 4,1,Verbose(3,LOG Check inventory)
+same => n,Playback(dungeon/noitems)
+same => n,Goto(s,mattack)
+
+exten => i,1(invalid),Verbose(3,LOG Invalid option)
+same => n,GoTo(s,1)
+
+[monsterstats]
+exten => s,1,Verbose(3,LOG Monster Stats)
+same => n,Set(HASH(monster_stats)=${GET_DUNGEON_MONSTER_STATS(${Xgps},${Ygps})})
+same => n,Set(monsterhealth=${HASH(monster_stats,monster_health)})
+same => n,Set(monsterweapon=${HASH(monster_stats,monster_attack)})
+same => n,Set(monster_agil=${HASH(monster_stats,monster_agil)})
+same => n,Set(monstername=${HASH(monster_stats,monster_name)})
+same => n,Return
+
+[fightshortener]
+exten => s,1,Verbose(3,LOG fight shortener)
+same => n,Verbose(3,LOG attacker is ${who})
+same => n,Verbose(3,LOG target is ${target})
+same => n,Verbose(3,LOG health is ${${target}health})
+same => n,Verbose(3,LOG weapon is ${${who}weapon})
+same => n,Verbose(3,LOG target agility is ${${target}_agil})
+  same => n,Verbose(3,${target}health=${${target}health} - attack=${${who}weapon})
+  same => n,Set(${target}health=${EVAL(${MATH(${${target}health}-${${who}weapon},i)})})
+  same => n,Return
+

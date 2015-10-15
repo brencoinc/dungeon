@@ -3,7 +3,7 @@
 [hero_start]
 
 exten => s,1,Verbose(3,Basic game settings and Hero info lookup) 
-;same => n,Set(encounter=0)
+same => n,Set(encounter=0)
 same => n,Set(attack=1)
 same => n,Set(fighthealth=0)
 same => n,Set(target=ghost)
@@ -13,34 +13,29 @@ same => n,GotoIf($[${ISNULL(${GET_HERO_HEALTH(${heronum})})}]?newplayer)
 same => n(readyplayerone),Verbose(3, Existing player get stats)
 same => n,Set(HASH(hero_stats)=${GET_HERO_STATS(${heronum})})
 same => n,Set(herohealth=${HASH(hero_stats,health)})
-same => n,Set(heroweapon=${HASH(hero_stats,weapon_mod)})
+same => n,Set(weapon_mod=${HASH(hero_stats,weapon_mod)})
 same => n,Set(weapon_name=${HASH(hero_stats,weapon_name)})
 same => n,Set(torch=${HASH(hero_stats,torch)})
 same => n,Set(Ygps=${HASH(hero_stats,gps_ypos)})
 same => n,Set(Xgps=${HASH(hero_stats,gps_xpos)})
 same => n,Set(doorkeys=${HASH(hero_stats,doorkeys)})
-same => n,Set(hero_agil=${HASH(hero_stats,agility)})
-;
-;same => n,Return
-;
+same => n,Set(agility=${HASH(hero_stats,agility)})
 same => n,Goto(explainer)
 same => n(newplayer),Verbose(3,New player)
-;Insert into DB, set timout variable then start over
-same => n,NoOp(Add Player to DB ${PUT_HERO_NEWHERO(${heronum})})
-same => n,NoOp(Add Player to DB ${PUT_HERO_NEWSESSION(${heronum})})
-same => n,Gosub(statmaker,s,1)
-same => n,Goto(readyplayerone)
-;if it returns play "something is wrong" and send an error email 
+same => n,Set(Xgps=5)
+same => n,Set(Ygps=17)
 ;
 same => n(explainer),Verbose(3, Stat Explainer)
 same => n,Background(dungeon/stats/health)
 same => n,SayDigits(${herohealth})
-same => n,Background(dungeon/items/weapon_name)
+same => n,Background(dungeon/stats/weapon_name)
 same => n,Background(dungeon/weapons/${weapon_name})
 same => n,Background(dungeon/stats/weapon_mod)
-same => n,SayDigits(${heroweapon})
-same => n,Background(dungeon/items/torch)
+same => n,SayDigits(${weapon_mod})
+same => n,Background(dungeon/stats/torch)
 same => n,SayDigits(${torch})
 same => n,Background(dungeon/stats/doorkeys)
 same => n,SayDigits(${doorkeys})
 same => n,Return
+
+
