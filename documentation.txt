@@ -1,0 +1,19 @@
+
+
+
+Trap handling
+Traps need the attributes in the db:
+    _level (general hardness of trap)
+    _agil  (minimum agility needed to not be hurt)
+    _strength (minimum strength needed to not be hurt)
+    _damage (damage inflicted if you fail the agil/strength check)
+_type   (style of trap) 
+the agil and strength can be 0 if it's easy to avoid but generally there should be SOME danger here
+
+Traps need the following sound
+
+name_defeat.wav  (sound to play if you fail the trap check)
+name_sprung.wav  (sound to play when finding a trap that has already been activated)
+name_start.wav   (sound to play when activating the trap)
+name_survive.wav (sound to play when you win the trap check)
+
